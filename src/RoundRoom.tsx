@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -53,6 +53,10 @@ export function RoundRoom({
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const questionPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (selectedId) questionPanel.current?.focus();
+  }, [selectedId]);
   const waiting = waitingStudents(room);
   const helping = room.students.filter((s) => s.status === "helping");
   const active = [...waiting, ...helping];
@@ -293,6 +297,8 @@ export function RoundRoom({
         </section>
         <aside
           id="round-question-panel"
+          ref={questionPanel}
+          tabIndex={-1}
           className={`round-question-panel ${selected ? "has-selection" : ""}`}
           aria-label="Student question"
           aria-live="polite"

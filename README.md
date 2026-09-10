@@ -22,6 +22,9 @@ Open the local address printed by Vite. `npm run build` checks TypeScript and cr
 5. Use **Room settings** to edit the room name, welcome message, and help topics. **Pause queue** temporarily prevents new arrivals.
 6. In **Student view**, build a pixel character before joining: optional gender, skin tone, hair style and color, eye color, outfit, clothing color, and pants color. All appearance options are independent of gender.
 7. The **Common Table** seats waiting students in arrival order, eight per table. Select a character to see their name and question, then **Call to help**. For larger queues, use the table navigation. The same character appears on queue entries, active help cards, and the student ticket.
+8. Choose **Room view** for the separate pastel-red room at `/#/room`: a circular brown table surrounded by standing characters and floating nameplates. Queue positions, topic colors, waiting times, and “Getting help” labels provide an overview. Click a character to read their question, call them over, or mark them as helped. Larger rooms use pages of eight characters.
+
+The original dashboard remains at `/#/instructor`, and the student join page is at `/#/student`. The pages share the current room and queue; browser Back/Forward and direct links work. Reloading selects the first saved room, as in the original prototype.
 
 ## Current scope
 
