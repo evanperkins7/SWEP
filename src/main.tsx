@@ -8,6 +8,7 @@ import {
   CheckCheck,
   ChevronRight,
   Clock3,
+  Circle,
   Code2,
   Coffee,
   Copy,
@@ -41,6 +42,16 @@ import { AvatarBuilder, PixelAvatar } from "./Character";
 import { defaultAvatar, normalizeAvatar, sampleAvatar } from "./avatar";
 import type { Avatar } from "./avatar";
 import { WaitingTable } from "./WaitingTable";
+import { RoundRoom } from "./RoundRoom";
+
+type AppView = "instructor" | "student" | "round";
+function viewFromHash(): AppView {
+  return window.location.hash === "#/room"
+    ? "round"
+    : window.location.hash === "#/student"
+      ? "student"
+      : "instructor";
+}
 
 const STORAGE = "table-rooms-v1";
 const COLORS = ["sage", "peach", "lilac", "sand"];
@@ -133,7 +144,16 @@ function Classroom() {
 function App() {
   const [rooms, setRooms] = useState<Room[]>(readRooms);
   const [activeCode, setActiveCode] = useState(() => rooms[0].code);
-  const [view, setView] = useState<"instructor" | "student">("instructor");
+  const [view, setCurrentView] = useState<AppView>(viewFromHash);
+  function setView(next: AppView) {
+    setCurrentView(next);
+    window.location.hash = next === "round" ? "/room" : `/${next}`;
+  }
+  useEffect(() => {
+    const syncView = () => setCurrentView(viewFromHash());
+    window.addEventListener("hashchange", syncView);
+    return () => window.removeEventListener("hashchange", syncView);
+  }, []);
   const [grouped, setGrouped] = useState(false);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -244,702 +264,741 @@ function App() {
   const currentStudent = joinedRoom?.students.find((s) => s.id === joined?.id);
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            setView("instructor");
-          }}
-          aria-label="Table home"
-        >
-          <img src="/table.svg" alt="" />
-          <span>
-            <b>TA</b>ble<span className="brand-dot">.</span>
-          </span>
-        </a>
-        <div className="workspace-label">YOUR TEACHING SPACE</div>
-        <button
-          className={`nav-item ${view === "instructor" ? "active" : ""}`}
-          onClick={() => setView("instructor")}
-        >
-          <LayoutGrid size={19} /> My room <span className="nav-dot" />
-        </button>
-        <button
-          className={`nav-item ${view === "student" ? "active" : ""}`}
-          onClick={() => {
-            setView("student");
-            setError("");
-          }}
-        >
-          <GraduationCap size={20} /> Student view{" "}
-          <ArrowRight className="nav-arrow" size={15} />
-        </button>
-        <div className="sidebar-divider" />
-        <div className="workspace-label">
-          YOUR ROOMS{" "}
-          <button aria-label="Create a room" onClick={() => setModal("room")}>
-            <Plus size={16} />
-          </button>
-        </div>
-        <div className="room-list">
-          {rooms.map((r) => (
-            <button
-              key={r.code}
-              className={r.code === activeCode ? "selected-room" : ""}
-              onClick={() => {
-                setActiveCode(r.code);
-                setFilter("all");
+      {view === "round" ? (
+        <RoundRoom
+          key={room.code}
+          room={room}
+          now={now}
+          onDashboard={() => setView("instructor")}
+          onStudentView={() => setView("student")}
+          onSettings={() => setModal("settings")}
+          onCreateRoom={() => setModal("room")}
+          onCopyCode={copyCode}
+          onToggleOpen={() => updateRoom((r) => ({ ...r, open: !r.open }))}
+          onStatus={status}
+        />
+      ) : (
+        <>
+          <aside className="sidebar">
+            <a
+              className="brand"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
                 setView("instructor");
               }}
+              aria-label="Table home"
             >
-              <span className={`little-square ${r.open ? "" : "muted"}`} />
-              <span>{r.course}</span>
-            </button>
-          ))}
-        </div>
-        <div className="sidebar-bottom">
-          <div className="sidebar-note">
-            <PixelPlant small />
-            <p>
-              Good questions.
-              <br />
-              Better together.
-            </p>
-            <span>Pull up a chair.</span>
-          </div>
-          <button className="nav-item" onClick={() => setModal("about")}>
-            <HelpCircle size={18} /> A little help
-          </button>
-          <div className="profile">
-            <div className="profile-avatar">TA</div>
-            <div>
-              <strong>Your teaching space</strong>
-              <span>Instructor · Local demo</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <div className="breadcrumb">
-            Workspace <ChevronRight size={14} />
-            <strong>
-              {view === "instructor" ? "My room" : "Student view"}
-            </strong>
-          </div>
-          <div className="top-actions">
-            <span className="demo-label">
-              <span /> Interactive prototype
-            </span>
+              <img src="/table.svg" alt="" />
+              <span>
+                <b>TA</b>ble<span className="brand-dot">.</span>
+              </span>
+            </a>
+            <div className="workspace-label">YOUR TEACHING SPACE</div>
             <button
-              className="button primary small-button"
-              onClick={() => setModal("room")}
+              className={`nav-item ${view === "instructor" ? "active" : ""}`}
+              onClick={() => setView("instructor")}
             >
-              <Plus size={16} /> Create room
+              <LayoutGrid size={19} /> My room <span className="nav-dot" />
             </button>
-          </div>
-        </header>
-        {view === "instructor" ? (
-          <main className="dashboard">
-            <div className="page-title">
-              <div>
-                <div className="eyebrow">
-                  <span className="status-dot" /> YOUR ROOM, AT A GLANCE
-                </div>
-                <h1>
-                  Room for a little help<span>.</span>
-                </h1>
-                <p>
-                  A place for every question. A little order to the office
-                  hours.
-                </p>
-              </div>
+            <button className="nav-item" onClick={() => setView("round")}>
+              <Circle size={19} /> Room view{" "}
+              <ArrowRight className="nav-arrow" size={15} />
+            </button>
+            <button
+              className={`nav-item ${view === "student" ? "active" : ""}`}
+              onClick={() => {
+                setView("student");
+                setError("");
+              }}
+            >
+              <GraduationCap size={20} /> Student view{" "}
+              <ArrowRight className="nav-arrow" size={15} />
+            </button>
+            <div className="sidebar-divider" />
+            <div className="workspace-label">
+              YOUR ROOMS{" "}
               <button
-                className="button neutral"
-                onClick={() => setModal("settings")}
+                aria-label="Create a room"
+                onClick={() => setModal("room")}
               >
-                <Settings2 size={16} /> Room settings
+                <Plus size={16} />
               </button>
             </div>
-            <section className="welcome-banner">
-              <div className="welcome-copy">
-                <span className="course-label">
-                  <Coffee size={15} />
-                  {room.course}
-                </span>
-                <h2>{room.title}</h2>
-                <p>Grab a seat. We’ll take it one question at a time.</p>
-                <span className="banner-status">
-                  <span className={`status-dot ${room.open ? "" : "paused"}`} />
-                  {room.open
-                    ? "Room is open for students"
-                    : "Room is paused for new arrivals"}
-                </span>
-              </div>
-              <Classroom />
-              <div className="join-code-card">
-                <span>COME ON IN. ROOM CODE</span>
+            <div className="room-list">
+              {rooms.map((r) => (
                 <button
-                  onClick={copyCode}
-                  aria-label={`Copy room code ${room.code}`}
+                  key={r.code}
+                  className={r.code === activeCode ? "selected-room" : ""}
+                  onClick={() => {
+                    setActiveCode(r.code);
+                    setFilter("all");
+                    setView("instructor");
+                  }}
                 >
-                  <strong>{room.code}</strong>
-                  <Copy size={17} />
+                  <span className={`little-square ${r.open ? "" : "muted"}`} />
+                  <span>{r.course}</span>
                 </button>
-                <div>Share the code. Find your people.</div>
+              ))}
+            </div>
+            <div className="sidebar-bottom">
+              <div className="sidebar-note">
+                <PixelPlant small />
+                <p>
+                  Good questions.
+                  <br />
+                  Better together.
+                </p>
+                <span>Pull up a chair.</span>
               </div>
-            </section>
-            <section className="stats">
-              <div className="stat">
-                <div className="stat-icon sage">
-                  <Users size={21} />
-                </div>
+              <button className="nav-item" onClick={() => setModal("about")}>
+                <HelpCircle size={18} /> A little help
+              </button>
+              <div className="profile">
+                <div className="profile-avatar">TA</div>
                 <div>
-                  <span>In the queue</span>
-                  <strong>
-                    {waiting.length.toString().padStart(2, "0")}
-                    <small>students waiting</small>
-                  </strong>
-                </div>
-                <span className="stat-decoration">···</span>
-              </div>
-              <div className="stat">
-                <div className="stat-icon peach">
-                  <MessageCircle size={21} />
-                </div>
-                <div>
-                  <span>At the table</span>
-                  <strong>
-                    {helping.length.toString().padStart(2, "0")}
-                    <small>getting help now</small>
-                  </strong>
+                  <strong>Your teaching space</strong>
+                  <span>Instructor · Local demo</span>
                 </div>
               </div>
-              <div className="stat">
-                <div className="stat-icon lilac">
-                  <CheckCheck size={21} />
-                </div>
-                <div>
-                  <span>All figured out</span>
-                  <strong>
-                    {done.length.toString().padStart(2, "0")}
-                    <small>students helped</small>
-                  </strong>
-                </div>
+            </div>
+          </aside>
+          <div className="main-shell">
+            <header className="topbar">
+              <div className="breadcrumb">
+                Workspace <ChevronRight size={14} />
+                <strong>
+                  {view === "instructor" ? "My room" : "Student view"}
+                </strong>
               </div>
-            </section>
-            <WaitingTable
-              key={room.code}
-              students={waiting}
-              topics={room.topics}
-              onHelp={(id) => status([id], "helping")}
-            />
-            <div className="content-grid">
-              <section className="queue-panel">
-                <div className="section-heading">
+              <div className="top-actions">
+                <button
+                  className="button neutral small-button"
+                  onClick={() => setView("round")}
+                >
+                  <Circle size={15} /> Room view
+                </button>
+                <span className="demo-label">
+                  <span /> Interactive prototype
+                </span>
+                <button
+                  className="button primary small-button"
+                  onClick={() => setModal("room")}
+                >
+                  <Plus size={16} /> Create room
+                </button>
+              </div>
+            </header>
+            {view === "instructor" ? (
+              <main className="dashboard">
+                <div className="page-title">
                   <div>
-                    <h2>
-                      The help queue{" "}
-                      <span className="count-badge">{waiting.length}</span>
-                    </h2>
-                    <p>First here, first helped. Just as it should be.</p>
-                  </div>
-                  <button
-                    className="text-button"
-                    onClick={() => updateRoom((r) => ({ ...r, open: !r.open }))}
-                  >
-                    {room.open ? <Pause size={15} /> : <Play size={15} />}{" "}
-                    {room.open ? "Pause queue" : "Open queue"}
-                  </button>
-                </div>
-                <div className="queue-toolbar">
-                  <div className="view-toggle">
-                    <button
-                      className={!grouped ? "selected" : ""}
-                      onClick={() => setGrouped(false)}
-                    >
-                      <List size={16} /> By arrival
-                    </button>
-                    <button
-                      className={grouped ? "selected" : ""}
-                      onClick={() => setGrouped(true)}
-                    >
-                      <LayoutGrid size={15} /> By topic
-                    </button>
-                  </div>
-                  <label className="search-box">
-                    <Search size={16} />
-                    <input
-                      aria-label="Search the queue"
-                      placeholder="Find a student…"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </label>
-                </div>
-                <div className="topic-filters">
-                  <button
-                    className={filter === "all" ? "selected" : ""}
-                    onClick={() => setFilter("all")}
-                  >
-                    All questions <span>{waiting.length}</span>
-                  </button>
-                  {room.topics.map((t) => (
-                    <button
-                      key={t.id}
-                      className={filter === t.id ? "selected" : ""}
-                      onClick={() => setFilter(t.id)}
-                    >
-                      <span className={`topic-dot ${t.color}`} />
-                      {t.name}
-                    </button>
-                  ))}
-                </div>
-                <div className="queue-column-labels">
-                  <span>STUDENT & QUESTION</span>
-                  <span>
-                    <ArrowDownUp size={12} /> ARRIVAL ORDER
-                  </span>
-                </div>
-                <div className="queue-list">
-                  {shown.length === 0 ? (
-                    <div className="empty-state">
-                      <Coffee size={30} />
-                      <h3>
-                        {waiting.length
-                          ? "No matching questions"
-                          : "A little breathing room."}
-                      </h3>
-                      <p>
-                        {waiting.length
-                          ? "Try another name or topic."
-                          : "Share your room code to welcome the first student."}
-                      </p>
+                    <div className="eyebrow">
+                      <span className="status-dot" /> YOUR ROOM, AT A GLANCE
                     </div>
-                  ) : grouped ? (
-                    room.topics.map((t) => {
-                      const students = shown.filter((s) => s.topicId === t.id);
-                      return students.length ? (
-                        <div className="topic-group" key={t.id}>
-                          <div className={`group-heading ${t.color}`}>
-                            <strong>
-                              {t.name} <span>· {students.length}</span>
-                            </strong>
-                            <button
-                              onClick={() =>
-                                status(
-                                  students.map((s) => s.id),
-                                  "helping",
-                                )
-                              }
-                            >
-                              Help group <ArrowRight size={14} />
-                            </button>
-                          </div>
-                          {students.map((s) =>
-                            studentCard(
-                              s,
-                              waiting.findIndex((w) => w.id === s.id),
-                            ),
-                          )}
-                        </div>
-                      ) : null;
-                    })
-                  ) : (
-                    shown.map((s) =>
-                      studentCard(
-                        s,
-                        waiting.findIndex((w) => w.id === s.id),
-                      ),
-                    )
-                  )}
-                </div>
-                <div className="queue-footer">
-                  <span>
-                    <span className="status-dot" />{" "}
-                    {room.open
-                      ? "Ready for new questions"
-                      : "New arrivals paused"}
-                  </span>
-                  <span>Every question has a place here.</span>
-                </div>
-              </section>
-              <aside className="right-column">
-                <section className="table-panel">
-                  <div className="section-heading">
-                    <h2>At the table</h2>
-                    <span className="count-badge peach">{helping.length}</span>
-                  </div>
-                  <p className="section-subtitle">
-                    A little guidance goes a long way.
-                  </p>
-                  {helping.length ? (
-                    helping.map((s) => (
-                      <div className="helping-card" key={s.id}>
-                        <div className="helping-person">
-                          <div className="avatar character-badge sand">
-                            <PixelAvatar
-                              avatar={s.avatar}
-                              label={`${s.name}’s character`}
-                            />
-                          </div>
-                          <div>
-                            <strong>{s.name}</strong>
-                            <span>
-                              {
-                                room.topics.find((t) => t.id === s.topicId)
-                                  ?.name
-                              }
-                            </span>
-                          </div>
-                          <span className="helping-dot" />
-                        </div>
-                        <p>
-                          {s.question || "Ready to work through a question."}
-                        </p>
-                        <button
-                          className="button complete-button"
-                          onClick={() => status([s.id], "done")}
-                        >
-                          <Check size={16} /> Mark as helped
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="table-empty">
-                      <Coffee size={26} />
-                      <p>
-                        Your table is ready.
-                        <br />
-                        Invite the next student over.
-                      </p>
-                      {waiting.length > 0 && (
-                        <button
-                          className="button neutral"
-                          onClick={() => status([waiting[0].id], "helping")}
-                        >
-                          Help next <ArrowRight size={14} />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </section>
-                <section className="topics-panel">
-                  <div className="section-heading">
-                    <h2>What brings you in?</h2>
-                    <button
-                      aria-label="Edit help topics"
-                      onClick={() => setModal("settings")}
-                    >
-                      <Settings2 size={17} />
-                    </button>
-                  </div>
-                  <p className="section-subtitle">
-                    Your room’s question topics.
-                  </p>
-                  <div className="topic-summary">
-                    {room.topics.map((t, i) => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          setFilter(t.id);
-                          setGrouped(true);
-                        }}
-                      >
-                        <span className={`topic-icon ${t.color}`}>
-                          {i % 3 === 0 ? (
-                            <Sparkles size={15} />
-                          ) : i % 3 === 1 ? (
-                            <Code2 size={15} />
-                          ) : (
-                            <MessageCircle size={15} />
-                          )}
-                        </span>
-                        <span>{t.name}</span>
-                        <b>
-                          {waiting.filter((s) => s.topicId === t.id).length}
-                        </b>
-                      </button>
-                    ))}
+                    <h1>
+                      Room for a little help<span>.</span>
+                    </h1>
+                    <p>
+                      A place for every question. A little order to the office
+                      hours.
+                    </p>
                   </div>
                   <button
-                    className="add-topic"
+                    className="button neutral"
                     onClick={() => setModal("settings")}
                   >
-                    <Plus size={15} /> Customize topics
+                    <Settings2 size={16} /> Room settings
                   </button>
-                </section>
-                <div className="little-note">
-                  <span>✦</span>
-                  <p>
-                    Same question? Same table.
-                    <br />
-                    <span>Group by topic to learn together.</span>
-                  </p>
                 </div>
-              </aside>
-            </div>
-            <footer className="page-footer">
-              <span className="mini-brand">TAble.</span>
-              <span>Less waiting around. More figuring it out.</span>
-              <span>
-                Made for the moments when it clicks <Sparkles size={13} />
-              </span>
-            </footer>
-          </main>
-        ) : (
-          <main className="student-page">
-            <div className="eyebrow">PULL UP A CHAIR</div>
-            <h1>
-              A good place to get unstuck<span>.</span>
-            </h1>
-            <p className="student-intro">
-              A question, a little help, and you’re on your way.
-            </p>
-            <div className="student-layout">
-              <div className="student-form-panel">
-                {currentStudent && joinedRoom ? (
-                  <div className="ticket">
-                    <div className="ticket-character">
-                      <PixelAvatar
-                        avatar={currentStudent.avatar}
-                        label="Your character"
-                      />
-                    </div>
-                    <span className="eyebrow">{joinedRoom.course}</span>
-                    <h2>
-                      {currentStudent.status === "done"
-                        ? "You’re all set!"
-                        : currentStudent.status === "helping"
-                          ? "Your seat is ready!"
-                          : "You’re in the queue."}
-                    </h2>
-                    <p>
-                      {currentStudent.status === "done"
-                        ? "Here’s to that lightbulb moment. Keep going."
-                        : currentStudent.status === "helping"
-                          ? "Your instructor has called you over. Come to the table."
-                          : `Thanks, ${currentStudent.name.split(" ")[0]}. We’ll keep your place.`}
-                    </p>
-                    {currentStudent.status === "waiting" && (
-                      <div className="ticket-position">
-                        <strong>
-                          #
-                          {waitingStudents(joinedRoom).findIndex(
-                            (s) => s.id === currentStudent.id,
-                          ) + 1}
-                        </strong>
-                        <span>your place in line</span>
-                      </div>
-                    )}
-                    <div className="ticket-topic">
-                      {
-                        joinedRoom.topics.find(
-                          (t) => t.id === currentStudent.topicId,
-                        )?.name
-                      }
-                    </div>
-                    <button
-                      className="button neutral"
-                      onClick={() => {
-                        if (currentStudent.status !== "done")
-                          updateRoom(
-                            (r) => ({
-                              ...r,
-                              students: r.students.filter(
-                                (s) => s.id !== currentStudent.id,
-                              ),
-                            }),
-                            joinedRoom.code,
-                          );
-                        setJoined(null);
-                        setStudentRoom(null);
-                        setError("");
-                      }}
-                    >
-                      {currentStudent.status === "done" ? (
-                        <ArrowLeft size={16} />
-                      ) : (
-                        <LogOut size={16} />
-                      )}{" "}
-                      {currentStudent.status === "done"
-                        ? "Back to join"
-                        : "Leave queue"}
-                    </button>
-                  </div>
-                ) : selectedStudentRoom ? (
-                  <form
-                    key={selectedStudentRoom.code}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const data = new FormData(e.currentTarget);
-                      const s: Student = {
-                        id: crypto.randomUUID(),
-                        name: String(data.get("name") || ""),
-                        topicId: String(data.get("topic") || ""),
-                        question: String(data.get("question") || "").trim(),
-                        joinedAt: Date.now(),
-                        status: "waiting",
-                        avatar: { ...avatar },
-                      };
-                      try {
-                        const latest = rooms.find(
-                          (r) => r.code === selectedStudentRoom.code,
-                        )!;
-                        const next = joinRoom(latest, s);
-                        updateRoom(() => next, next.code);
-                        setJoined({ code: next.code, id: s.id });
-                        setError("");
-                      } catch (err) {
-                        setError((err as Error).message);
-                      }
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="text-button back-button"
-                      onClick={() => {
-                        setStudentRoom(null);
-                        setError("");
-                      }}
-                    >
-                      <ArrowLeft size={15} /> Change room
-                    </button>
-                    <span className="room-chip">
-                      ROOM {selectedStudentRoom.code}
+                <section className="welcome-banner">
+                  <div className="welcome-copy">
+                    <span className="course-label">
+                      <Coffee size={15} />
+                      {room.course}
                     </span>
-                    <h2>{selectedStudentRoom.course}</h2>
-                    <label>
-                      Your name
-                      <input
-                        name="name"
-                        required
-                        maxLength={60}
-                        placeholder="What should we call you?"
-                        autoComplete="name"
+                    <h2>{room.title}</h2>
+                    <p>Grab a seat. We’ll take it one question at a time.</p>
+                    <span className="banner-status">
+                      <span
+                        className={`status-dot ${room.open ? "" : "paused"}`}
                       />
-                    </label>
-                    <AvatarBuilder value={avatar} onChange={setAvatar} />
-                    <fieldset>
-                      <legend>What brings you in?</legend>
-                      <div className="student-topic-options">
-                        {selectedStudentRoom.topics.map((t) => (
-                          <label key={t.id} className={t.color}>
-                            <input
-                              type="radio"
-                              name="topic"
-                              value={t.id}
-                              required
-                            />
+                      {room.open
+                        ? "Room is open for students"
+                        : "Room is paused for new arrivals"}
+                    </span>
+                  </div>
+                  <Classroom />
+                  <div className="join-code-card">
+                    <span>COME ON IN. ROOM CODE</span>
+                    <button
+                      onClick={copyCode}
+                      aria-label={`Copy room code ${room.code}`}
+                    >
+                      <strong>{room.code}</strong>
+                      <Copy size={17} />
+                    </button>
+                    <div>Share the code. Find your people.</div>
+                  </div>
+                </section>
+                <section className="stats">
+                  <div className="stat">
+                    <div className="stat-icon sage">
+                      <Users size={21} />
+                    </div>
+                    <div>
+                      <span>In the queue</span>
+                      <strong>
+                        {waiting.length.toString().padStart(2, "0")}
+                        <small>students waiting</small>
+                      </strong>
+                    </div>
+                    <span className="stat-decoration">···</span>
+                  </div>
+                  <div className="stat">
+                    <div className="stat-icon peach">
+                      <MessageCircle size={21} />
+                    </div>
+                    <div>
+                      <span>At the table</span>
+                      <strong>
+                        {helping.length.toString().padStart(2, "0")}
+                        <small>getting help now</small>
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="stat">
+                    <div className="stat-icon lilac">
+                      <CheckCheck size={21} />
+                    </div>
+                    <div>
+                      <span>All figured out</span>
+                      <strong>
+                        {done.length.toString().padStart(2, "0")}
+                        <small>students helped</small>
+                      </strong>
+                    </div>
+                  </div>
+                </section>
+                <WaitingTable
+                  key={room.code}
+                  students={waiting}
+                  topics={room.topics}
+                  onHelp={(id) => status([id], "helping")}
+                />
+                <div className="content-grid">
+                  <section className="queue-panel">
+                    <div className="section-heading">
+                      <div>
+                        <h2>
+                          The help queue{" "}
+                          <span className="count-badge">{waiting.length}</span>
+                        </h2>
+                        <p>First here, first helped. Just as it should be.</p>
+                      </div>
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          updateRoom((r) => ({ ...r, open: !r.open }))
+                        }
+                      >
+                        {room.open ? <Pause size={15} /> : <Play size={15} />}{" "}
+                        {room.open ? "Pause queue" : "Open queue"}
+                      </button>
+                    </div>
+                    <div className="queue-toolbar">
+                      <div className="view-toggle">
+                        <button
+                          className={!grouped ? "selected" : ""}
+                          onClick={() => setGrouped(false)}
+                        >
+                          <List size={16} /> By arrival
+                        </button>
+                        <button
+                          className={grouped ? "selected" : ""}
+                          onClick={() => setGrouped(true)}
+                        >
+                          <LayoutGrid size={15} /> By topic
+                        </button>
+                      </div>
+                      <label className="search-box">
+                        <Search size={16} />
+                        <input
+                          aria-label="Search the queue"
+                          placeholder="Find a student…"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="topic-filters">
+                      <button
+                        className={filter === "all" ? "selected" : ""}
+                        onClick={() => setFilter("all")}
+                      >
+                        All questions <span>{waiting.length}</span>
+                      </button>
+                      {room.topics.map((t) => (
+                        <button
+                          key={t.id}
+                          className={filter === t.id ? "selected" : ""}
+                          onClick={() => setFilter(t.id)}
+                        >
+                          <span className={`topic-dot ${t.color}`} />
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="queue-column-labels">
+                      <span>STUDENT & QUESTION</span>
+                      <span>
+                        <ArrowDownUp size={12} /> ARRIVAL ORDER
+                      </span>
+                    </div>
+                    <div className="queue-list">
+                      {shown.length === 0 ? (
+                        <div className="empty-state">
+                          <Coffee size={30} />
+                          <h3>
+                            {waiting.length
+                              ? "No matching questions"
+                              : "A little breathing room."}
+                          </h3>
+                          <p>
+                            {waiting.length
+                              ? "Try another name or topic."
+                              : "Share your room code to welcome the first student."}
+                          </p>
+                        </div>
+                      ) : grouped ? (
+                        room.topics.map((t) => {
+                          const students = shown.filter(
+                            (s) => s.topicId === t.id,
+                          );
+                          return students.length ? (
+                            <div className="topic-group" key={t.id}>
+                              <div className={`group-heading ${t.color}`}>
+                                <strong>
+                                  {t.name} <span>· {students.length}</span>
+                                </strong>
+                                <button
+                                  onClick={() =>
+                                    status(
+                                      students.map((s) => s.id),
+                                      "helping",
+                                    )
+                                  }
+                                >
+                                  Help group <ArrowRight size={14} />
+                                </button>
+                              </div>
+                              {students.map((s) =>
+                                studentCard(
+                                  s,
+                                  waiting.findIndex((w) => w.id === s.id),
+                                ),
+                              )}
+                            </div>
+                          ) : null;
+                        })
+                      ) : (
+                        shown.map((s) =>
+                          studentCard(
+                            s,
+                            waiting.findIndex((w) => w.id === s.id),
+                          ),
+                        )
+                      )}
+                    </div>
+                    <div className="queue-footer">
+                      <span>
+                        <span className="status-dot" />{" "}
+                        {room.open
+                          ? "Ready for new questions"
+                          : "New arrivals paused"}
+                      </span>
+                      <span>Every question has a place here.</span>
+                    </div>
+                  </section>
+                  <aside className="right-column">
+                    <section className="table-panel">
+                      <div className="section-heading">
+                        <h2>At the table</h2>
+                        <span className="count-badge peach">
+                          {helping.length}
+                        </span>
+                      </div>
+                      <p className="section-subtitle">
+                        A little guidance goes a long way.
+                      </p>
+                      {helping.length ? (
+                        helping.map((s) => (
+                          <div className="helping-card" key={s.id}>
+                            <div className="helping-person">
+                              <div className="avatar character-badge sand">
+                                <PixelAvatar
+                                  avatar={s.avatar}
+                                  label={`${s.name}’s character`}
+                                />
+                              </div>
+                              <div>
+                                <strong>{s.name}</strong>
+                                <span>
+                                  {
+                                    room.topics.find((t) => t.id === s.topicId)
+                                      ?.name
+                                  }
+                                </span>
+                              </div>
+                              <span className="helping-dot" />
+                            </div>
+                            <p>
+                              {s.question ||
+                                "Ready to work through a question."}
+                            </p>
+                            <button
+                              className="button complete-button"
+                              onClick={() => status([s.id], "done")}
+                            >
+                              <Check size={16} /> Mark as helped
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="table-empty">
+                          <Coffee size={26} />
+                          <p>
+                            Your table is ready.
+                            <br />
+                            Invite the next student over.
+                          </p>
+                          {waiting.length > 0 && (
+                            <button
+                              className="button neutral"
+                              onClick={() => status([waiting[0].id], "helping")}
+                            >
+                              Help next <ArrowRight size={14} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                    <section className="topics-panel">
+                      <div className="section-heading">
+                        <h2>What brings you in?</h2>
+                        <button
+                          aria-label="Edit help topics"
+                          onClick={() => setModal("settings")}
+                        >
+                          <Settings2 size={17} />
+                        </button>
+                      </div>
+                      <p className="section-subtitle">
+                        Your room’s question topics.
+                      </p>
+                      <div className="topic-summary">
+                        {room.topics.map((t, i) => (
+                          <button
+                            key={t.id}
+                            onClick={() => {
+                              setFilter(t.id);
+                              setGrouped(true);
+                            }}
+                          >
+                            <span className={`topic-icon ${t.color}`}>
+                              {i % 3 === 0 ? (
+                                <Sparkles size={15} />
+                              ) : i % 3 === 1 ? (
+                                <Code2 size={15} />
+                              ) : (
+                                <MessageCircle size={15} />
+                              )}
+                            </span>
                             <span>{t.name}</span>
-                          </label>
+                            <b>
+                              {waiting.filter((s) => s.topicId === t.id).length}
+                            </b>
+                          </button>
                         ))}
                       </div>
-                    </fieldset>
-                    <label>
-                      A little more context{" "}
-                      <span className="optional">(optional)</span>
-                      <textarea
-                        name="question"
-                        maxLength={300}
-                        rows={3}
-                        placeholder="Where are you getting stuck?"
-                      />
-                    </label>
-                    {error && (
-                      <p role="alert" className="form-error">
-                        {error}
+                      <button
+                        className="add-topic"
+                        onClick={() => setModal("settings")}
+                      >
+                        <Plus size={15} /> Customize topics
+                      </button>
+                    </section>
+                    <div className="little-note">
+                      <span>✦</span>
+                      <p>
+                        Same question? Same table.
+                        <br />
+                        <span>Group by topic to learn together.</span>
                       </p>
-                    )}
-                    {!selectedStudentRoom.open && (
-                      <p className="form-error">
-                        This room is paused. Check back in a moment.
-                      </p>
-                    )}
-                    <button
-                      className="button primary full-button"
-                      disabled={!selectedStudentRoom.open}
-                    >
-                      Take a seat <ArrowRight size={17} />
-                    </button>
-                  </form>
-                ) : (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const found = rooms.find(
-                        (r) => r.code === joinCode.trim().toUpperCase(),
-                      );
-                      if (!found) {
-                        setError(
-                          "We couldn’t find that room in this browser. Check the code and try again.",
-                        );
-                        return;
-                      }
-                      setStudentRoom(found.code);
-                      setError("");
-                    }}
-                  >
-                    <span className="student-door">
-                      <DoorOpen size={27} />
-                    </span>
-                    <h2>Come on in.</h2>
-                    <p>Enter the code from your TA or instructor.</p>
-                    <label>
-                      Room code
-                      <input
-                        className="code-input"
-                        placeholder="ABC123"
-                        value={joinCode}
-                        onChange={(e) =>
-                          setJoinCode(e.target.value.toUpperCase())
-                        }
-                        required
-                        maxLength={6}
-                        minLength={6}
-                        autoCapitalize="characters"
-                        autoComplete="off"
-                      />
-                    </label>
-                    {error && (
-                      <p role="alert" className="form-error">
-                        {error}
-                      </p>
-                    )}
-                    <button className="button primary full-button">
-                      Find my room <ArrowRight size={17} />
-                    </button>
-                    <button
-                      type="button"
-                      className="try-demo"
-                      onClick={() => setJoinCode(room.code)}
-                    >
-                      Trying it out? Use <b>{room.code}</b>
-                    </button>
-                  </form>
-                )}
-              </div>
-              <div className="student-welcome">
-                <Classroom />
-                <h2>No question too small.</h2>
-                <p>
-                  Pick a topic. Keep your place.
-                  <br />
-                  We’ll figure out the rest together.
-                </p>
-                <div className="local-notice">
-                  <span className="status-dot" /> Local prototype · Rooms work
-                  in this browser.
-                  <br />
-                  Cross-device joining will need a backend.
+                    </div>
+                  </aside>
                 </div>
-              </div>
-            </div>
-          </main>
-        )}
-      </div>
+                <footer className="page-footer">
+                  <span className="mini-brand">TAble.</span>
+                  <span>Less waiting around. More figuring it out.</span>
+                  <span>
+                    Made for the moments when it clicks <Sparkles size={13} />
+                  </span>
+                </footer>
+              </main>
+            ) : (
+              <main className="student-page">
+                <div className="eyebrow">PULL UP A CHAIR</div>
+                <h1>
+                  A good place to get unstuck<span>.</span>
+                </h1>
+                <p className="student-intro">
+                  A question, a little help, and you’re on your way.
+                </p>
+                <div className="student-layout">
+                  <div className="student-form-panel">
+                    {currentStudent && joinedRoom ? (
+                      <div className="ticket">
+                        <div className="ticket-character">
+                          <PixelAvatar
+                            avatar={currentStudent.avatar}
+                            label="Your character"
+                          />
+                        </div>
+                        <span className="eyebrow">{joinedRoom.course}</span>
+                        <h2>
+                          {currentStudent.status === "done"
+                            ? "You’re all set!"
+                            : currentStudent.status === "helping"
+                              ? "Your seat is ready!"
+                              : "You’re in the queue."}
+                        </h2>
+                        <p>
+                          {currentStudent.status === "done"
+                            ? "Here’s to that lightbulb moment. Keep going."
+                            : currentStudent.status === "helping"
+                              ? "Your instructor has called you over. Come to the table."
+                              : `Thanks, ${currentStudent.name.split(" ")[0]}. We’ll keep your place.`}
+                        </p>
+                        {currentStudent.status === "waiting" && (
+                          <div className="ticket-position">
+                            <strong>
+                              #
+                              {waitingStudents(joinedRoom).findIndex(
+                                (s) => s.id === currentStudent.id,
+                              ) + 1}
+                            </strong>
+                            <span>your place in line</span>
+                          </div>
+                        )}
+                        <div className="ticket-topic">
+                          {
+                            joinedRoom.topics.find(
+                              (t) => t.id === currentStudent.topicId,
+                            )?.name
+                          }
+                        </div>
+                        <button
+                          className="button neutral"
+                          onClick={() => {
+                            if (currentStudent.status !== "done")
+                              updateRoom(
+                                (r) => ({
+                                  ...r,
+                                  students: r.students.filter(
+                                    (s) => s.id !== currentStudent.id,
+                                  ),
+                                }),
+                                joinedRoom.code,
+                              );
+                            setJoined(null);
+                            setStudentRoom(null);
+                            setError("");
+                          }}
+                        >
+                          {currentStudent.status === "done" ? (
+                            <ArrowLeft size={16} />
+                          ) : (
+                            <LogOut size={16} />
+                          )}{" "}
+                          {currentStudent.status === "done"
+                            ? "Back to join"
+                            : "Leave queue"}
+                        </button>
+                      </div>
+                    ) : selectedStudentRoom ? (
+                      <form
+                        key={selectedStudentRoom.code}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const data = new FormData(e.currentTarget);
+                          const s: Student = {
+                            id: crypto.randomUUID(),
+                            name: String(data.get("name") || ""),
+                            topicId: String(data.get("topic") || ""),
+                            question: String(data.get("question") || "").trim(),
+                            joinedAt: Date.now(),
+                            status: "waiting",
+                            avatar: { ...avatar },
+                          };
+                          try {
+                            const latest = rooms.find(
+                              (r) => r.code === selectedStudentRoom.code,
+                            )!;
+                            const next = joinRoom(latest, s);
+                            updateRoom(() => next, next.code);
+                            setJoined({ code: next.code, id: s.id });
+                            setError("");
+                          } catch (err) {
+                            setError((err as Error).message);
+                          }
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="text-button back-button"
+                          onClick={() => {
+                            setStudentRoom(null);
+                            setError("");
+                          }}
+                        >
+                          <ArrowLeft size={15} /> Change room
+                        </button>
+                        <span className="room-chip">
+                          ROOM {selectedStudentRoom.code}
+                        </span>
+                        <h2>{selectedStudentRoom.course}</h2>
+                        <label>
+                          Your name
+                          <input
+                            name="name"
+                            required
+                            maxLength={60}
+                            placeholder="What should we call you?"
+                            autoComplete="name"
+                          />
+                        </label>
+                        <AvatarBuilder value={avatar} onChange={setAvatar} />
+                        <fieldset>
+                          <legend>What brings you in?</legend>
+                          <div className="student-topic-options">
+                            {selectedStudentRoom.topics.map((t) => (
+                              <label key={t.id} className={t.color}>
+                                <input
+                                  type="radio"
+                                  name="topic"
+                                  value={t.id}
+                                  required
+                                />
+                                <span>{t.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+                        <label>
+                          A little more context{" "}
+                          <span className="optional">(optional)</span>
+                          <textarea
+                            name="question"
+                            maxLength={300}
+                            rows={3}
+                            placeholder="Where are you getting stuck?"
+                          />
+                        </label>
+                        {error && (
+                          <p role="alert" className="form-error">
+                            {error}
+                          </p>
+                        )}
+                        {!selectedStudentRoom.open && (
+                          <p className="form-error">
+                            This room is paused. Check back in a moment.
+                          </p>
+                        )}
+                        <button
+                          className="button primary full-button"
+                          disabled={!selectedStudentRoom.open}
+                        >
+                          Take a seat <ArrowRight size={17} />
+                        </button>
+                      </form>
+                    ) : (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const found = rooms.find(
+                            (r) => r.code === joinCode.trim().toUpperCase(),
+                          );
+                          if (!found) {
+                            setError(
+                              "We couldn’t find that room in this browser. Check the code and try again.",
+                            );
+                            return;
+                          }
+                          setStudentRoom(found.code);
+                          setError("");
+                        }}
+                      >
+                        <span className="student-door">
+                          <DoorOpen size={27} />
+                        </span>
+                        <h2>Come on in.</h2>
+                        <p>Enter the code from your TA or instructor.</p>
+                        <label>
+                          Room code
+                          <input
+                            className="code-input"
+                            placeholder="ABC123"
+                            value={joinCode}
+                            onChange={(e) =>
+                              setJoinCode(e.target.value.toUpperCase())
+                            }
+                            required
+                            maxLength={6}
+                            minLength={6}
+                            autoCapitalize="characters"
+                            autoComplete="off"
+                          />
+                        </label>
+                        {error && (
+                          <p role="alert" className="form-error">
+                            {error}
+                          </p>
+                        )}
+                        <button className="button primary full-button">
+                          Find my room <ArrowRight size={17} />
+                        </button>
+                        <button
+                          type="button"
+                          className="try-demo"
+                          onClick={() => setJoinCode(room.code)}
+                        >
+                          Trying it out? Use <b>{room.code}</b>
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                  <div className="student-welcome">
+                    <Classroom />
+                    <h2>No question too small.</h2>
+                    <p>
+                      Pick a topic. Keep your place.
+                      <br />
+                      We’ll figure out the rest together.
+                    </p>
+                    <div className="local-notice">
+                      <span className="status-dot" /> Local prototype · Rooms
+                      work in this browser.
+                      <br />
+                      Cross-device joining will need a backend.
+                    </div>
+                  </div>
+                </div>
+              </main>
+            )}
+          </div>
+        </>
+      )}
       {toast && (
         <div className="toast" role="status">
           <Check size={17} />
